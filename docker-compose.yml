@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/cep-crawler
+      - QUEUE_URL=http://elasticmq:9324
+      - QUEUE_NAME=cep-queue
+      - VIA_CEP_BASE_URL=https://viacep.com.br/ws
+      - RATE_LIMIT_REQUESTS_PER_SECOND=3
+    depends_on:
+      - mongo
+      - elasticmq
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/cep-crawler
+      - QUEUE_URL=http://elasticmq:9324
+      - QUEUE_NAME=cep-queue
+      - VIA_CEP_BASE_URL=https://viacep.com.br/ws
+      - RATE_LIMIT_REQUESTS_PER_SECOND=3
+      - WORKER_CONCURRENCY=2
+      - MAX_RETRIES=3
+    depends_on:
+      - mongo
+      - elasticmq
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:latest
+    ports:
+      - "9324:9324"
+      - "9325:9325"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+
+networks:
+  app-network:
+    driver: bridge
